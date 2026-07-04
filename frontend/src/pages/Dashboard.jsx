@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { storeService, cameraService, shelfService, productService } from '../services/api';
+import { 
+  storeService, 
+  cameraService, 
+  shelfService, 
+  productService, 
+  eventService 
+} from '../services/api';
 import { 
   Store, 
   Video, 
@@ -37,6 +43,7 @@ ChartJS.register(
 
 export default function Dashboard() {
   const [storeId, setStoreId] = useState(null);
+  const [events, setEvents] = useState([]);
   
   // Dashboard stats
   const [stats, setStats] = useState({
@@ -45,13 +52,6 @@ export default function Dashboard() {
     shelvesCount: 0,
     productsCount: 0
   });
-
-  const [events, setEvents] = useState([
-    { id: 1, message: 'Shopper #494 entered Zone: Snacks', time: 'Just now', type: 'info' },
-    { id: 2, message: 'Shelf A (Beverages) Dwell Time anomaly detected (+24%)', time: '2m ago', type: 'warning' },
-    { id: 3, message: 'Camera "Aisle 3 Overhead" stream re-calibrated successfully', time: '10m ago', type: 'success' },
-    { id: 4, message: 'Product "Coca-Cola 330ml" placed on Shelf "Beverage Stand 1"', time: '15m ago', type: 'info' }
-  ]);
 
   // Storage listener for store change
   useEffect(() => {
@@ -69,11 +69,17 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Load stats and events
   useEffect(() => {
     loadStats();
+    loadEvents();
+    
+    // Refresh events from MongoDB every 5 seconds
+    const interval = setInterval(loadEvents, 5000);
+    return () => clearInterval(interval);
   }, [storeId]);
 
-  // Feed simulator
+  // Feed simulator: periodically pushes a simulated CV event to MongoDB
   useEffect(() => {
     const eventTemplates = [
       { message: 'Shopper #{id} paused at Shelf {shelf} (Dwell: {dwell}s)', type: 'info' },
@@ -82,7 +88,10 @@ export default function Dashboard() {
       { message: 'Shopper #{id} completed checkout journey', type: 'info' }
     ];
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
+      // Only push logs if logged in
+      if (!localStorage.getItem('token')) return;
+
       const template = eventTemplates[Math.floor(Math.random() * eventTemplates.length)];
       const mockId = Math.floor(Math.random() * 800) + 100;
       const mockDwell = Math.floor(Math.random() * 25) + 5;
@@ -90,18 +99,20 @@ export default function Dashboard() {
       const productNames = ['Diet Coke 500ml', 'Lays Potato Chips', 'Pringles Sour Cream'];
       const cameraNames = ['Cam-01 Entry', 'Cam-02 Snacks', 'Cam-03 Checkouts'];
 
-      let message = template.message
+      const message = template.message
         .replace('{id}', mockId.toString())
         .replace('{dwell}', mockDwell.toString())
         .replace('{shelf}', shelvesNames[Math.floor(Math.random() * shelvesNames.length)])
         .replace('{product}', productNames[Math.floor(Math.random() * productNames.length)])
         .replace('{camera}', cameraNames[Math.floor(Math.random() * cameraNames.length)]);
 
-      setEvents((prev) => [
-        { id: Date.now(), message, time: 'Just now', type: template.type },
-        ...prev.slice(0, 5) // Keep last 6 events
-      ]);
-    }, 6000);
+      try {
+        await eventService.create(message, template.type);
+        loadEvents();
+      } catch (err) {
+        console.error('Failed to log simulated event to MongoDB', err);
+      }
+    }, 8000);
 
     return () => clearInterval(interval);
   }, []);
@@ -115,7 +126,6 @@ export default function Dashboard() {
 
       if (storeId) {
         cameras = await cameraService.listByStore(storeId);
-        // For shelves, we'll sum up shelves in all store zones
         const zones = await zoneService.listByStore(storeId);
         for (const zone of zones) {
           const zoneShelves = await shelfService.listByZone(zone.id);
@@ -131,6 +141,15 @@ export default function Dashboard() {
       });
     } catch (e) {
       console.error('Failed to load dashboard statistics', e);
+    }
+  }
+
+  async function loadEvents() {
+    try {
+      const data = await eventService.list(10);
+      setEvents(data);
+    } catch (e) {
+      console.error('Failed to retrieve events from MongoDB', e);
     }
   }
 
@@ -273,31 +292,37 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Real-time events logging stream */}
+      {/* Real-time events logging stream from MongoDB */}
       <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-lg space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 className="font-bold text-white flex items-center space-x-2">
             <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
-            <span>Detection Streams Live Log</span>
+            <span>Detection Streams Live Log (MongoDB)</span>
           </h3>
           <span className="text-xs text-slate-400 font-mono">Status: Connected</span>
         </div>
 
         <div className="space-y-2.5 max-h-60 overflow-y-auto pr-2">
-          {events.map((evt) => (
-            <div 
-              key={evt.id} 
-              className="flex items-center justify-between bg-slate-950/60 border border-slate-850 px-4 py-3 rounded-lg text-sm animate-in slide-in-from-top-1"
-            >
-              <div className="flex items-center space-x-3">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${
-                  evt.type === 'warning' ? 'bg-amber-500' : evt.type === 'success' ? 'bg-emerald-500' : 'bg-purple-500'
-                }`} />
-                <span className="text-slate-350">{evt.message}</span>
+          {events.length > 0 ? (
+            events.map((evt) => (
+              <div 
+                key={evt.id} 
+                className="flex items-center justify-between bg-slate-950/60 border border-slate-850 px-4 py-3 rounded-lg text-sm animate-in slide-in-from-top-1"
+              >
+                <div className="flex items-center space-x-3">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${
+                    evt.type === 'warning' ? 'bg-amber-500' : evt.type === 'success' ? 'bg-emerald-500' : 'bg-purple-500'
+                  }`} />
+                  <span className="text-slate-350">{evt.message}</span>
+                </div>
+                <span className="text-xs text-slate-500 font-mono shrink-0 ml-4">
+                  {new Date(evt.timestamp).toLocaleTimeString()}
+                </span>
               </div>
-              <span className="text-xs text-slate-500 font-mono shrink-0 ml-4">{evt.time}</span>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-sm text-slate-500 italic py-2">No event records loaded from MongoDB.</p>
+          )}
         </div>
       </div>
     </div>

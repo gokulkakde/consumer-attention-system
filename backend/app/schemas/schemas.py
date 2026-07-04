@@ -178,3 +178,16 @@ class Camera(CameraBase):
 
     class Config:
         from_attributes = True
+
+# --- MongoDB Event Schemas ---
+class EventBase(BaseModel):
+    message: str
+    type: str = "info"  # info, success, warning
+
+class EventCreate(EventBase):
+    pass
+
+class Event(EventBase):
+    id: str
+    timestamp: datetime
+
