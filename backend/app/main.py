@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.endpoints import auth, users, stores, zones, shelves, products, cameras
+from app.api.endpoints import auth, users, stores, zones, shelves, products, cameras, events
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -25,6 +25,7 @@ app.include_router(zones.router, prefix=f"{settings.API_STR}/zones", tags=["Zone
 app.include_router(shelves.router, prefix=f"{settings.API_STR}/shelves", tags=["Shelf Management"])
 app.include_router(products.router, prefix=f"{settings.API_STR}/products", tags=["Product Management"])
 app.include_router(cameras.router, prefix=f"{settings.API_STR}/cameras", tags=["Camera Management"])
+app.include_router(events.router, prefix=f"{settings.API_STR}/events", tags=["Event Logs (MongoDB)"])
 
 @app.get("/", tags=["Health"])
 def health_check():

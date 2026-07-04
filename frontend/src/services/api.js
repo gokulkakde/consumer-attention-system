@@ -208,4 +208,15 @@ export const userService = {
   }
 };
 
+export const eventService = {
+  list: async (limit = 50) => {
+    const response = await api.get('/events/', { params: { limit } });
+    return response.data;
+  },
+  create: async (message, type = 'info') => {
+    const response = await api.post('/events/', { message, type });
+    return response.data;
+  }
+};
+
 export default api;

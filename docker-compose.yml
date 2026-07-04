@@ -15,6 +15,18 @@ services:
       - ./pgdata:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
 
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: consumer-attention-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@attentionmap.com
+      PGADMIN_DEFAULT_PASSWORD: password123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
   mongodb:
     image: mongo:6.0
     container_name: consumer-attention-mongodb
@@ -25,3 +37,14 @@ services:
       MONGO_INITDB_DATABASE: consumer_attention_mongodb
     volumes:
       - ./mongodata:/data/db
+
+  mongo-express:
+    image: mongo-express
+    container_name: consumer-attention-mongo-express
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017/
+    depends_on:
+      - mongodb
