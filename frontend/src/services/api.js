@@ -261,5 +261,21 @@ export const analyticsService = {
   }
 };
 
+export const behaviorService = {
+  getHeatmap: async (storeId) => {
+    const response = await api.get('/behavior/heatmap', { params: { store_id: storeId } });
+    return response.data;
+  },
+  getSegmentation: async (storeId) => {
+    const response = await api.get('/behavior/segmentation', { params: { store_id: storeId } });
+    return response.data;
+  },
+  getRecommendations: async (storeId) => {
+    const response = await api.get('/behavior/recommendations', { params: { store_id: storeId } });
+    return response.data;
+  }
+};
+
 export default api;
+
 

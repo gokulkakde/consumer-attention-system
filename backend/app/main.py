@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.api.endpoints import auth, users, stores, zones, shelves, products, cameras, events, analytics
+from app.api.endpoints import auth, users, stores, zones, shelves, products, cameras, events, analytics, behavior_api
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,7 +21,7 @@ app = FastAPI(
 # CORS middleware configuration to allow frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For dev simplicity, allow all. In production, restrict to frontend domain.
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +37,7 @@ app.include_router(products.router, prefix=f"{settings.API_STR}/products", tags=
 app.include_router(cameras.router, prefix=f"{settings.API_STR}/cameras", tags=["Camera Management"])
 app.include_router(events.router, prefix=f"{settings.API_STR}/events", tags=["Event Logs (MongoDB)"])
 app.include_router(analytics.router, prefix=f"{settings.API_STR}/analytics", tags=["Attention Analytics"])
+app.include_router(behavior_api.router, prefix=f"{settings.API_STR}/behavior", tags=["Behavior Analytics"])
 
 @app.get("/", tags=["Health"])
 def health_check():
