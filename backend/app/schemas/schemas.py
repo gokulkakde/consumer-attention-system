@@ -191,3 +191,22 @@ class Event(EventBase):
     id: str
     timestamp: datetime
 
+
+# --- Dwell Time Schemas ---
+class DwellTimeBase(BaseModel):
+    shelf_id: int
+    average_dwell_time: Decimal
+    interaction_count: int
+    attractiveness_score: Decimal
+
+class DwellTimeCreate(DwellTimeBase):
+    pass
+
+class DwellTime(DwellTimeBase):
+    id: int
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+

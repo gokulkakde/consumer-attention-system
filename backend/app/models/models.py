@@ -94,3 +94,15 @@ class Camera(Base):
 
     store = relationship("Store", back_populates="cameras")
     zone = relationship("Zone", back_populates="cameras")
+
+class DwellTime(Base):
+    __tablename__ = "dwell_times"
+    id = Column(Integer, primary_key=True, index=True)
+    shelf_id = Column(Integer, ForeignKey("shelves.id", ondelete="CASCADE"))
+    average_dwell_time = Column(Numeric(10, 2), nullable=False, default=0.0)
+    interaction_count = Column(Integer, nullable=False, default=0)
+    attractiveness_score = Column(Numeric(5, 2), nullable=False, default=0.0)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+    shelf = relationship("Shelf")
+

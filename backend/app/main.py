@@ -1,11 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+
 from app.core.config import settings
-from app.api.endpoints import auth, users, stores, zones, shelves, products, cameras, events
+from app.core.database import Base, engine
+from app.api.endpoints import auth, users, stores, zones, shelves, products, cameras, events, analytics
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create any missing database tables on startup
+    Base.metadata.create_all(bind=engine)
+    yield
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_STR}/openapi.json"
+    openapi_url=f"{settings.API_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # CORS middleware configuration to allow frontend access
@@ -26,6 +36,7 @@ app.include_router(shelves.router, prefix=f"{settings.API_STR}/shelves", tags=["
 app.include_router(products.router, prefix=f"{settings.API_STR}/products", tags=["Product Management"])
 app.include_router(cameras.router, prefix=f"{settings.API_STR}/cameras", tags=["Camera Management"])
 app.include_router(events.router, prefix=f"{settings.API_STR}/events", tags=["Event Logs (MongoDB)"])
+app.include_router(analytics.router, prefix=f"{settings.API_STR}/analytics", tags=["Attention Analytics"])
 
 @app.get("/", tags=["Health"])
 def health_check():

@@ -219,4 +219,31 @@ export const eventService = {
   }
 };
 
+export const analyticsService = {
+  listDwellTimes: async () => {
+    const response = await api.get('/analytics/dwell-times');
+    return response.data;
+  },
+  listAttractiveness: async () => {
+    const response = await api.get('/analytics/attractiveness');
+    return response.data;
+  },
+  listSessions: async (storeId, limit = 20) => {
+    const response = await api.get('/analytics/sessions', { params: { store_id: storeId, limit } });
+    return response.data;
+  },
+  uploadVideo: async (storeId, file) => {
+    const formData = new FormData();
+    formData.append('store_id', storeId);
+    formData.append('file', file);
+    const response = await api.post('/analytics/upload-video', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+};
+
 export default api;
+

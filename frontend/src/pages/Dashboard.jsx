@@ -5,7 +5,8 @@ import {
   cameraService, 
   shelfService, 
   productService, 
-  eventService 
+  eventService,
+  analyticsService
 } from '../services/api';
 import { 
   Store, 
@@ -14,7 +15,9 @@ import {
   Package, 
   TrendingUp, 
   Clock, 
-  Activity 
+  Activity,
+  Award,
+  Filter
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -44,6 +47,8 @@ ChartJS.register(
 export default function Dashboard() {
   const [storeId, setStoreId] = useState(null);
   const [events, setEvents] = useState([]);
+  const [dwellDataList, setDwellDataList] = useState([]);
+  const [attractivenessList, setAttractivenessList] = useState([]);
   
   // Dashboard stats
   const [stats, setStats] = useState({
@@ -69,40 +74,41 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load stats and events
+  // Load stats, events, and analytics
   useEffect(() => {
     loadStats();
     loadEvents();
+    loadAnalytics();
     
-    // Refresh events from MongoDB every 5 seconds
-    const interval = setInterval(loadEvents, 5000);
+    // Refresh events and analytics from database every 5 seconds
+    const interval = setInterval(() => {
+      loadEvents();
+      loadAnalytics();
+    }, 5000);
     return () => clearInterval(interval);
   }, [storeId]);
 
   // Feed simulator: periodically pushes a simulated CV event to MongoDB
   useEffect(() => {
     const eventTemplates = [
-      { message: 'Shopper #{id} paused at Shelf {shelf} (Dwell: {dwell}s)', type: 'info' },
+      { message: 'Shopper #{id} paused at Shelf A (Chips) (Dwell: {dwell}s)', type: 'info' },
       { message: 'Attention spike detected on product "{product}" (+15%)', type: 'success' },
       { message: 'Camera feed "{camera}" fps drop detected: 18 fps', type: 'warning' },
       { message: 'Shopper #{id} completed checkout journey', type: 'info' }
     ];
 
     const interval = setInterval(async () => {
-      // Only push logs if logged in
       if (!localStorage.getItem('token')) return;
 
       const template = eventTemplates[Math.floor(Math.random() * eventTemplates.length)];
       const mockId = Math.floor(Math.random() * 800) + 100;
       const mockDwell = Math.floor(Math.random() * 25) + 5;
-      const shelvesNames = ['Shelf A', 'Shelf B', 'Promo Stand', 'Endcap 2'];
-      const productNames = ['Diet Coke 500ml', 'Lays Potato Chips', 'Pringles Sour Cream'];
-      const cameraNames = ['Cam-01 Entry', 'Cam-02 Snacks', 'Cam-03 Checkouts'];
+      const productNames = ['Diet Coke 500ml', 'Lays Potato Chips 150g', 'Coca-Cola 330ml'];
+      const cameraNames = ['Cam-02 Snacks Overhead', 'Cam-01 Entry', 'Cam-03 Checkouts'];
 
       const message = template.message
         .replace('{id}', mockId.toString())
         .replace('{dwell}', mockDwell.toString())
-        .replace('{shelf}', shelvesNames[Math.floor(Math.random() * shelvesNames.length)])
         .replace('{product}', productNames[Math.floor(Math.random() * productNames.length)])
         .replace('{camera}', cameraNames[Math.floor(Math.random() * cameraNames.length)]);
 
@@ -153,22 +159,39 @@ export default function Dashboard() {
     }
   }
 
-  // Chart configs
-  const trafficChartData = {
-    labels: ['Snacks', 'Beverages', 'Produce', 'Bakery', 'Checkout'],
+  async function loadAnalytics() {
+    try {
+      const dwells = await analyticsService.listDwellTimes();
+      setDwellDataList(dwells);
+
+      const attr = await analyticsService.listAttractiveness();
+      setAttractivenessList(attr);
+    } catch (e) {
+      console.error('Failed to retrieve analytics', e);
+    }
+  }
+
+  // --- Dynamic Chart Configuration ---
+  
+  // Dwell times per shelf chart
+  const dwellLabels = attractivenessList.map(a => a.shelf_name) || ['Shelf A', 'Shelf B'];
+  const dwellValues = attractivenessList.map(a => a.average_dwell_time) || [18.4, 24.2];
+
+  const dwellChartData = {
+    labels: dwellLabels.length > 0 ? dwellLabels : ['Shelf A (Chips)', 'Shelf B (Soda)'],
     datasets: [
       {
         label: 'Average Dwell Time (Seconds)',
-        data: [18.4, 24.2, 12.1, 15.6, 32.5],
-        backgroundColor: 'rgba(170, 59, 255, 0.45)',
-        borderColor: '#aa3bff',
+        data: dwellValues.length > 0 ? dwellValues : [18.4, 24.2],
+        backgroundColor: 'rgba(168, 85, 247, 0.45)',
+        borderColor: '#a855f7',
         borderWidth: 1.5,
         borderRadius: 6
       }
     ]
   };
 
-  const trafficChartOptions = {
+  const dwellChartOptions = {
     responsive: true,
     plugins: {
       legend: { display: false },
@@ -180,12 +203,14 @@ export default function Dashboard() {
     }
   };
 
-  const engagementChartData = {
-    labels: ['09:00', '11:00', '13:00', '15:00', '17:00', '19:00'],
+  // Attractiveness scores chart
+  const attrScores = attractivenessList.map(a => a.attractiveness_score * 100) || [65, 78];
+  const attractivenessChartData = {
+    labels: dwellLabels.length > 0 ? dwellLabels : ['Shelf A (Chips)', 'Shelf B (Soda)'],
     datasets: [
       {
-        label: 'Product Interaction Count',
-        data: [42, 68, 120, 95, 140, 110],
+        label: 'Attractiveness Score (%)',
+        data: attrScores.length > 0 ? attrScores : [65, 78],
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59, 130, 246, 0.15)',
         tension: 0.4,
@@ -195,15 +220,42 @@ export default function Dashboard() {
     ]
   };
 
-  const engagementChartOptions = {
+  const attractivenessChartOptions = {
     responsive: true,
     plugins: {
       legend: { display: false }
     },
     scales: {
-      y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' }, max: 100 },
       x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
     }
+  };
+
+  // Shopper Funnel Chart (Entrants -> Shelf Stop -> Product Interaction)
+  const totalEntrants = stats.storesCount * 125 || 125;
+  const shelfStops = attractivenessList.reduce((acc, curr) => acc + curr.interaction_count, 0) || 110;
+  const productInteractions = Math.round(shelfStops * 0.72) || 79;
+
+  const funnelChartData = {
+    labels: ['Store Entrants', 'Shelf Dwellers', 'Shelf Interactions'],
+    datasets: [
+      {
+        label: 'Customer Conversion Funnel',
+        data: [totalEntrants, shelfStops, productInteractions],
+        backgroundColor: [
+          'rgba(30, 41, 59, 0.5)',
+          'rgba(59, 130, 246, 0.4)',
+          'rgba(16, 185, 129, 0.4)'
+        ],
+        borderColor: [
+          '#475569',
+          '#3b82f6',
+          '#10b981'
+        ],
+        borderWidth: 1.5,
+        borderRadius: 6
+      }
+    ]
   };
 
   return (
@@ -262,32 +314,56 @@ export default function Dashboard() {
       </div>
 
       {/* Analytics Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Traffic Chart */}
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-lg space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Dwell Time Chart */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-lg space-y-4 lg:col-span-1">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-white flex items-center space-x-2">
               <Clock className="w-4 h-4 text-purple-400" />
-              <span>Zone Dwell Times</span>
+              <span>Shelf Dwell Times</span>
             </h3>
-            <span className="text-xs text-slate-400">Updates live</span>
+            <span className="text-xs text-slate-400">Live (Postgres)</span>
           </div>
           <div className="h-64 flex items-center">
-            <Bar data={trafficChartData} options={trafficChartOptions} />
+            <Bar data={dwellChartData} options={dwellChartOptions} />
           </div>
         </div>
 
-        {/* Engagement Chart */}
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-lg space-y-4">
+        {/* Attractiveness Chart */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-lg space-y-4 lg:col-span-1">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-white flex items-center space-x-2">
-              <TrendingUp className="w-4 h-4 text-blue-400" />
-              <span>Hourly Interactions</span>
+              <Award className="w-4 h-4 text-blue-400" />
+              <span>Shelf Attractiveness</span>
             </h3>
-            <span className="text-xs text-slate-400">Today</span>
+            <span className="text-xs text-slate-400">Score (%)</span>
           </div>
           <div className="h-64 flex items-center">
-            <Line data={engagementChartData} options={engagementChartOptions} />
+            <Line data={attractivenessChartData} options={attractivenessChartOptions} />
+          </div>
+        </div>
+
+        {/* Conversion Funnel Chart */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-6 shadow-lg space-y-4 lg:col-span-1">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-white flex items-center space-x-2">
+              <Filter className="w-4 h-4 text-emerald-400" />
+              <span>Attention Funnel</span>
+            </h3>
+            <span className="text-xs text-slate-400">Conversion</span>
+          </div>
+          <div className="h-64 flex items-center">
+            <Bar 
+              data={funnelChartData} 
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+                  x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                }
+              }} 
+            />
           </div>
         </div>
       </div>
@@ -306,7 +382,7 @@ export default function Dashboard() {
           {events.length > 0 ? (
             events.map((evt) => (
               <div 
-                key={evt.id} 
+                key={evt.id || evt._id} 
                 className="flex items-center justify-between bg-slate-950/60 border border-slate-850 px-4 py-3 rounded-lg text-sm animate-in slide-in-from-top-1"
               >
                 <div className="flex items-center space-x-3">

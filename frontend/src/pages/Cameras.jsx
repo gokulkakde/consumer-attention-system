@@ -1,6 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { cameraService, zoneService } from '../services/api';
-import { Plus, Edit2, Trash2, Video, VideoOff, RefreshCw, X, Play, Info } from 'lucide-react';
+import { cameraService, zoneService, analyticsService } from '../services/api';
+import { 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  Video, 
+  VideoOff, 
+  RefreshCw, 
+  X, 
+  Play, 
+  Info,
+  UploadCloud,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-react';
 
 export default function Cameras() {
   const [storeId, setStoreId] = useState(null);
@@ -8,6 +21,12 @@ export default function Cameras() {
   const [zones, setZones] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Video Upload States
+  const [videoFile, setVideoFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
 
   // Modal State
   const [isOpen, setIsOpen] = useState(false);
@@ -57,7 +76,6 @@ export default function Cameras() {
       const data = await cameraService.listByStore(sId);
       setCameras(data);
       if (data.length > 0) {
-        // Auto-select first camera if none selected
         if (!selectedCamera || !data.some(c => c.id === selectedCamera.id)) {
           setSelectedCamera(data[0]);
         }
@@ -130,23 +148,22 @@ export default function Cameras() {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
       ctx.lineWidth = 2;
       
-      // Shelf A (Top Aisle)
-      ctx.fillRect(50, 40, 220, 60);
-      ctx.strokeRect(50, 40, 220, 60);
+      // Shelf A (Chips / Snacks)
+      ctx.fillRect(50, 60, 220, 100);
+      ctx.strokeRect(50, 60, 220, 100);
       ctx.fillStyle = '#64748b';
       ctx.font = '10px monospace';
-      ctx.fillText('SHELF A (SNACKS)', 60, 75);
+      ctx.fillText('SHELF A (CHIPS)', 60, 95);
 
-      // Shelf B (Bottom Aisle)
+      // Shelf B (Soda / Beverages)
       ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-      ctx.fillRect(350, 40, 220, 60);
-      ctx.strokeRect(350, 40, 220, 60);
+      ctx.fillRect(350, 60, 220, 100);
+      ctx.strokeRect(350, 60, 220, 100);
       ctx.fillStyle = '#64748b';
-      ctx.fillText('SHELF B (BEVERAGES)', 360, 75);
+      ctx.fillText('SHELF B (SODA)', 360, 95);
 
       // 2. Draw Bounding Boxes and Paths
       shoppers.forEach(s => {
-        // Move shopper toward target
         const dx = s.targetX - s.x;
         const dy = s.targetY - s.y;
         const dist = Math.sqrt(dx*dx + dy*dy);
@@ -155,12 +172,10 @@ export default function Cameras() {
           s.x += (dx / dist) * s.speed;
           s.y += (dy / dist) * s.speed;
         } else {
-          // Choose new random target inside canvas
           s.targetX = Math.random() * (canvas.width - 100) + 50;
-          s.targetY = Math.random() * (canvas.height - 100) + 50;
+          s.targetY = Math.random() * (canvas.height - 150) + 100;
         }
 
-        // Increment dwell counters occasionally
         if (frameCount % 60 === 0) {
           s.dwell += 1;
         }
@@ -185,6 +200,14 @@ export default function Cameras() {
         ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
         ctx.fill();
 
+        // Gaze line projection
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y - 10);
+        ctx.lineTo(s.x + (s.id === 104 ? 40 : -30), s.y + 60);
+        ctx.stroke();
+
         // Label details
         ctx.fillStyle = '#ffffff';
         ctx.font = '10px Inter, sans-serif';
@@ -195,10 +218,10 @@ export default function Cameras() {
       });
 
       // 3. Draw Camera Metadata HUD overlays
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(10, 10, 200, 50);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(10, 10, 240, 50);
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.strokeRect(10, 10, 200, 50);
+      ctx.strokeRect(10, 10, 240, 50);
 
       ctx.fillStyle = '#ef4444';
       ctx.beginPath();
@@ -207,13 +230,13 @@ export default function Cameras() {
 
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 11px Inter, sans-serif';
-      ctx.fillText('LIVE STREAM', 35, 28);
+      ctx.fillText('LIVE STREAM FEED', 35, 28);
       ctx.font = '9px monospace';
       ctx.fillStyle = '#94a3b8';
       ctx.fillText(`Cam: ${selectedCamera.name}`, 20, 48);
       
       const ts = new Date().toLocaleTimeString();
-      ctx.fillText(`TS: ${ts} | FPS: 30`, 110, 28);
+      ctx.fillText(`TS: ${ts} | FPS: 30`, 120, 28);
 
       animationRef.current = requestAnimationFrame(render);
     };
@@ -226,6 +249,34 @@ export default function Cameras() {
       }
     };
   }, [selectedCamera]);
+
+  // --- Video Upload Handler ---
+  const handleVideoFileChange = (e) => {
+    if (e.target.files.length > 0) {
+      setVideoFile(e.target.files[0]);
+      setUploadResult(null);
+      setUploadError(null);
+    }
+  };
+
+  const handleUploadVideo = async (e) => {
+    e.preventDefault();
+    if (!videoFile || !storeId) return;
+
+    setUploading(true);
+    setUploadError(null);
+    setUploadResult(null);
+
+    try {
+      const response = await analyticsService.uploadVideo(storeId, videoFile);
+      setUploadResult(response);
+      setVideoFile(null);
+    } catch (err) {
+      setUploadError(err.response?.data?.detail || 'An error occurred during video analysis.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // --- CRUD Handlers ---
 
@@ -320,82 +371,151 @@ export default function Cameras() {
       {/* Main Split Interface */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start flex-1">
         {/* Left Column: Registered Cameras list */}
-        <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <span className="font-bold text-white flex items-center space-x-2">
-              <Video className="w-4 h-4 text-purple-400" />
-              <span>Registered Devices ({cameras.length})</span>
-            </span>
-            <button onClick={() => loadCameras(storeId)} className="text-slate-400 hover:text-white transition-all cursor-pointer">
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="w-8 h-8 border-3 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="lg:col-span-5 space-y-6">
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <span className="font-bold text-white flex items-center space-x-2">
+                <Video className="w-4 h-4 text-purple-400" />
+                <span>Registered Devices ({cameras.length})</span>
+              </span>
+              <button onClick={() => loadCameras(storeId)} className="text-slate-400 hover:text-white transition-all cursor-pointer">
+                <RefreshCw className="w-4 h-4" />
+              </button>
             </div>
-          ) : cameras.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 text-sm">No cameras registered for this store.</div>
-          ) : (
-            <div className="space-y-3">
-              {cameras.map((cam) => (
-                <div
-                  key={cam.id}
-                  onClick={() => setSelectedCamera(cam)}
-                  className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-                    selectedCamera?.id === cam.id
-                      ? 'bg-purple-600/10 border-purple-500/40'
-                      : 'bg-slate-950/20 border-slate-850 hover:bg-slate-800/20'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-bold text-white">{cam.name}</h4>
-                      <span className="text-xs text-slate-500 font-mono block truncate mt-1">
-                        {cam.rtsp_url}
+
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="w-8 h-8 border-3 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : cameras.length === 0 ? (
+              <div className="text-center py-12 text-slate-500 text-sm">No cameras registered for this store.</div>
+            ) : (
+              <div className="space-y-3">
+                {cameras.map((cam) => (
+                  <div
+                    key={cam.id}
+                    onClick={() => setSelectedCamera(cam)}
+                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                      selectedCamera?.id === cam.id
+                        ? 'bg-purple-600/10 border-purple-500/40'
+                        : 'bg-slate-950/20 border-slate-850 hover:bg-slate-800/20'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-bold text-white">{cam.name}</h4>
+                        <span className="text-xs text-slate-500 font-mono block truncate mt-1">
+                          {cam.rtsp_url}
+                        </span>
+                      </div>
+
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+                        cam.status === 'active'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : cam.status === 'maintenance'
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                      }`}>
+                        {cam.status}
                       </span>
                     </div>
 
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
-                      cam.status === 'active'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        : cam.status === 'maintenance'
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                        : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                    }`}>
-                      {cam.status}
-                    </span>
+                    <div className="border-t border-slate-850 pt-3 mt-4 flex items-center justify-between text-xs text-slate-400">
+                      <span>Zone: {zones.find(z => z.id === cam.zone_id)?.name || 'Unassigned'}</span>
+                      
+                      {canEdit && (
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(cam);
+                            }}
+                            className="p-1 hover:bg-slate-850 rounded text-slate-400 hover:text-white transition-all cursor-pointer"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(cam.id);
+                            }}
+                            className="p-1 hover:bg-rose-500/10 rounded text-slate-400 hover:text-rose-455 transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-                  <div className="border-t border-slate-850 pt-3 mt-4 flex items-center justify-between text-xs text-slate-400">
-                    <span>Zone: {zones.find(z => z.id === cam.zone_id)?.name || 'Unassigned'}</span>
-                    
-                    {canEdit && (
-                      <div className="flex items-center space-x-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditModal(cam);
-                          }}
-                          className="p-1 hover:bg-slate-850 rounded text-slate-400 hover:text-white transition-all cursor-pointer"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(cam.id);
-                          }}
-                          className="p-1 hover:bg-rose-500/10 rounded text-slate-400 hover:text-rose-455 transition-all cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
+          {/* Video Analysis Uploader Box */}
+          {canEdit && (
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-xl space-y-4">
+              <div className="border-b border-slate-800 pb-3">
+                <span className="font-bold text-white flex items-center space-x-2">
+                  <UploadCloud className="w-4 h-4 text-purple-400" />
+                  <span>CV Shopper Tracker Video Upload</span>
+                </span>
+              </div>
+
+              <form onSubmit={handleUploadVideo} className="space-y-4">
+                <div className="border border-dashed border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-slate-950/20 hover:bg-slate-950/40 transition-all relative">
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoFileChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    disabled={uploading}
+                  />
+                  <UploadCloud className="w-10 h-10 text-slate-500 mb-2" />
+                  <span className="text-xs font-semibold text-slate-300">
+                    {videoFile ? videoFile.name : 'Click or Drag Video File here'}
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-1">Supports MP4, AVI, MOV, MKV</span>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!videoFile || uploading}
+                  className="w-full flex items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-lg font-semibold shadow-lg hover:shadow-purple-500/20 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Analyzing Detections...</span>
+                    </>
+                  ) : (
+                    <span>Analyze Bounding Box Tracking</span>
+                  )}
+                </button>
+              </form>
+
+              {/* Upload Outcomes Messages */}
+              {uploadResult && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-2 text-xs">
+                  <div className="flex items-center space-x-2 text-emerald-400 font-bold">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Analysis Complete!</span>
+                  </div>
+                  <div className="text-slate-400 font-mono space-y-1">
+                    <p>File: {uploadResult.file_name}</p>
+                    <p>Tracked Shoppers: {uploadResult.metrics?.total_shoppers_tracked}</p>
+                    <p>Processed Frames: {uploadResult.metrics?.processed_frames}</p>
+                    <p>Stream Duration: {uploadResult.metrics?.video_duration_seconds?.toFixed(1)}s</p>
                   </div>
                 </div>
-              ))}
+              )}
+
+              {uploadError && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start space-x-2 text-xs text-rose-400">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -434,7 +554,7 @@ export default function Cameras() {
                 <div>
                   <h4 className="font-semibold text-slate-300">Simulated Retail CV Analysis Engine</h4>
                   <p className="mt-1 leading-relaxed">
-                    This simulator mimics deep-learning analytical frameworks. Moving points indicate shoppers, green vectors show gaze directions towards product shelves, and dwell counters trigger real-time attractiveness scores.
+                    This simulator mimics deep-learning analytical frameworks. Bounding boxes track consumers, red vector extensions draw gaze intersections toward mapped shelves, and dwell counters calculate attentiveness metrics saved directly in MongoDB and PostgreSQL.
                   </p>
                 </div>
               </div>
