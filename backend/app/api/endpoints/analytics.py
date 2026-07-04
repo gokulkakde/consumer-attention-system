@@ -11,6 +11,7 @@ from app.core.database import get_db, mongo_db
 from app.schemas import schemas
 from app.models import models
 from app.services.tracking import ShopperTracker
+from app.services.dataset_loader import DatasetLoader
 
 router = APIRouter()
 
@@ -98,3 +99,19 @@ def upload_store_video(
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+@router.get("/datasets/coco")
+def get_coco_sample(current_user: models.User = view_dependency):
+    return DatasetLoader.load_coco_sample()
+
+@router.get("/datasets/sku110k")
+def get_sku110k_sample(current_user: models.User = view_dependency):
+    return DatasetLoader.load_sku110k_sample()
+
+@router.get("/datasets/traffic")
+def get_traffic_sample(current_user: models.User = view_dependency):
+    return DatasetLoader.load_retail_traffic_sample()
+
+@router.get("/datasets/checkout")
+def get_checkout_sample(current_user: models.User = view_dependency):
+    return DatasetLoader.load_retail_checkout_sample()

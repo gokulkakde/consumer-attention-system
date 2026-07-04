@@ -1,0 +1,22 @@
+{
+  "info": {
+    "description": "COCO Person Detection Sample for Consumer Attention System",
+    "url": "http://cocodataset.org",
+    "version": "1.0",
+    "year": 2026,
+    "contributor": "COCO Consortium",
+    "date_created": "2026-07-04"
+  },
+  "images": [
+    {"id": 1, "width": 640, "height": 480, "file_name": "store_entrance_frame1.jpg"},
+    {"id": 2, "width": 640, "height": 480, "file_name": "store_entrance_frame2.jpg"}
+  ],
+  "annotations": [
+    {"id": 1, "image_id": 1, "category_id": 1, "segmentation": [], "area": 28800.0, "bbox": [100, 120, 120, 240], "iscrowd": 0},
+    {"id": 2, "image_id": 1, "category_id": 1, "segmentation": [], "area": 20000.0, "bbox": [320, 150, 100, 200], "iscrowd": 0},
+    {"id": 3, "image_id": 2, "category_id": 1, "segmentation": [], "area": 29000.0, "bbox": [110, 118, 122, 238], "iscrowd": 0}
+  ],
+  "categories": [
+    {"id": 1, "name": "person", "supercategory": "person"}
+  ]
+}

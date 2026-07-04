@@ -1,0 +1,9 @@
+[
+  {
+    "checkout_id": "checkout_101",
+    "items": [
+      {"item_id": 1, "sku": "SKU-COKE-002", "confidence": 0.98, "bbox": [100, 200, 50, 100]},
+      {"item_id": 2, "sku": "SKU-LAYS-001", "confidence": 0.95, "bbox": [180, 210, 80, 120]}
+    ]
+  }
+]

@@ -242,6 +242,22 @@ export const analyticsService = {
       },
     });
     return response.data;
+  },
+  getCocoDataset: async () => {
+    const response = await api.get('/analytics/datasets/coco');
+    return response.data;
+  },
+  getSku110kDataset: async () => {
+    const response = await api.get('/analytics/datasets/sku110k');
+    return response.data;
+  },
+  getTrafficDataset: async () => {
+    const response = await api.get('/analytics/datasets/traffic');
+    return response.data;
+  },
+  getCheckoutDataset: async () => {
+    const response = await api.get('/analytics/datasets/checkout');
+    return response.data;
   }
 };
 

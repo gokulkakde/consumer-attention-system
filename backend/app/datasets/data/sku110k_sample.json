@@ -1,0 +1,7 @@
+[
+  {"image_name": "shelf_chips_display.jpg", "x1": 50, "y1": 60, "x2": 100, "y2": 110, "class_name": "product"},
+  {"image_name": "shelf_chips_display.jpg", "x1": 110, "y1": 60, "x2": 160, "y2": 110, "class_name": "product"},
+  {"image_name": "shelf_chips_display.jpg", "x1": 170, "y1": 60, "x2": 220, "y2": 110, "class_name": "product"},
+  {"image_name": "shelf_beverages_display.jpg", "x1": 350, "y1": 60, "x2": 400, "y2": 120, "class_name": "product"},
+  {"image_name": "shelf_beverages_display.jpg", "x1": 410, "y1": 60, "x2": 460, "y2": 120, "class_name": "product"}
+]
