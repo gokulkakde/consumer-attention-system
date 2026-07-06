@@ -1,3 +1,8 @@
+import os
+# Configure SQLite DB file for testing before app imports to prevent connecting to production DB
+os.environ["DATABASE_URL"] = "sqlite:///./test_analytics.db"
+os.environ["MONGODB_DB"] = "test_consumer_attention_mongodb"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

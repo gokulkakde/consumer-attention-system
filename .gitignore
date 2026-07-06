@@ -28,6 +28,7 @@ dist-ssr/
 # Databases (Docker volume mounts)
 pgdata/
 mongodata/
+backend/*.db
 
 # VS Code / IDEs
 .vscode/
